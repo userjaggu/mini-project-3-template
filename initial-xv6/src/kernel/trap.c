@@ -9,6 +9,7 @@
 struct spinlock tickslock;
 uint ticks;
 
+int page_f = 0;
 extern char trampoline[], uservec[], userret[];
 
 // in kernelvec.S, calls kerneltrap().
@@ -63,6 +64,42 @@ void usertrap(void)
     intr_on();
 
     syscall();
+  }
+  else if (r_scause() == 15)
+  {
+    page_f++;
+    p->page_faults++;
+    // printf("%d\n", page_f);
+    pte_t *pte;
+    uint64 addr = r_stval(), pa;
+    if(addr >= MAXVA){
+      p->killed = 1;
+      exit(-1);
+    }
+    char *mem;
+    addr = PGROUNDDOWN(addr);
+
+    pte = walk(p->pagetable, addr, 0);
+    if (!pte || !(*pte & PTE_V) || !(*pte & PTE_C))
+    {
+      printf("Page fault at %p\n", addr);
+      p->killed = 1;
+      exit(-1);
+    }
+
+    pa = PTE2PA(*pte);
+
+    if ((mem = kalloc()) == 0)
+    {
+      p->killed = 1;
+      exit(-1);
+    }
+
+    memmove(mem, (void *)pa, PGSIZE);
+    kfree((void *)pa);
+
+    *pte = PA2PTE(mem) | PTE_FLAGS(*pte) | PTE_W;
+    *pte &= ~PTE_C;
   }
   else if ((which_dev = devintr()) != 0)
   {

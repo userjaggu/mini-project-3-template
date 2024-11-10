@@ -149,6 +149,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  p->page_faults = 0;
   p->rtime = 0;
   p->etime = 0;
   p->ctime = ticks;
@@ -356,7 +357,7 @@ void reparent(struct proc *p)
 void exit(int status)
 {
   struct proc *p = myproc();
-
+  // printf("%d\n", p->page_faults);
   if (p == initproc)
     panic("init exiting");
 
